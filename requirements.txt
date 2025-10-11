@@ -1,0 +1,6 @@
+nest-asyncio==1.6.0
+gradio==5.49.1
+llama-index==0.14.4
+llama-index-llms-huggingface==0.6.1
+llama-index-llms-huggingface-api==0.6.1
+llama-index-embeddings-huggingface==0.6.1 
