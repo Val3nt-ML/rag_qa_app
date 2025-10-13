@@ -12,19 +12,22 @@ from retrieval.rag_helper import RAGHelper
 
 
 def update_button_state(
-    uploaded_file: str | None = None, rag_helper: RAGHelper | None = None
-) -> tuple[gr.Button, RAGHelper | None]:
+    index_markdown: str, uploaded_file: str | None = None, rag_helper: RAGHelper | None = None
+) -> tuple[gr.Button, RAGHelper | None, str]:
     if not uploaded_file or not rag_helper:
-        if rag_helper:
-            del rag_helper
-            gc.collect()
-        return gr.Button(interactive=True, value="Build Index from document"), None
-    return gr.Button(interactive=False, value="Index built."), rag_helper
+        del rag_helper
+        gc.collect()
+        return (
+            gr.Button(interactive=True, value="Build Index from document"),
+            None,
+            "No Index built yet.",
+        )
+    return gr.Button(interactive=False, value="Index built."), rag_helper, index_markdown
 
 
 def building_button_handler(
     uploaded_file: str | None = None,
-) -> Generator[gr.Button, RAGHelper | None, str]:
+) -> Generator[tuple[gr.Button, RAGHelper | None, str], None, None]:
     if not uploaded_file:
         yield (
             gr.Button(interactive=True, value="Build Index from document"),
@@ -150,7 +153,7 @@ def clear_inputs():
 
 
 # Create the Gradio interface
-with gr.Blocks(title="Document Q&A Interface") as demo:
+with gr.Blocks(title="Document Q&A Interface") as app:
     gr.Markdown("# 📚 Document Question & Answer Interface")
     gr.Markdown("Upload a document and ask a question about it!")
 
@@ -184,8 +187,12 @@ with gr.Blocks(title="Document Q&A Interface") as demo:
     # Event handlers -------------------------------------------------------------------
     document_input.change(
         fn=update_button_state,
-        inputs=[document_input, rag_helper],
-        outputs=[build_index_btn, rag_helper],  # 🔑 Key: The button itself is the output!
+        inputs=[index_markdown, document_input, rag_helper],
+        outputs=[
+            build_index_btn,
+            rag_helper,
+            index_markdown,
+        ],  # 🔑 Key: The button itself is the output!
     )
 
     build_index_btn.click(
@@ -227,9 +234,11 @@ with gr.Blocks(title="Document Q&A Interface") as demo:
         inputs=[question_input, document_input],
     )
 
+
 if __name__ == "__main__":
+    print("Starting RAG Application on port 7860 ...")
     # Launch the interface
-    demo.launch(
+    app.launch(
         share=False,
         server_name="0.0.0.0",
         server_port=7860,  # Default Gradio port

@@ -1,0 +1,15 @@
+services:
+  rag_app:
+    image: rag_app
+    build: .
+    environment:
+      - PYTHONPATH=/app/src
+    # environment:
+    #   - APP_ENV=production
+    #   - APP_DEBUG=false
+    command: python /app/src/main.py
+    ports:
+      - "7860:7860"
+    volumes:
+      - ./src:/app/src
+      - ./hf_token.json:/app/hf_token.json
