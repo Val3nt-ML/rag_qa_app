@@ -2,6 +2,7 @@ import gc
 import json
 import os
 from pathlib import Path
+import shutil
 from typing import Generator
 
 import gradio as gr
@@ -66,12 +67,12 @@ def build_index_from_file(
         progress(0, desc="Starting index build...")
 
         # Load HuggingFace token
-        progress(0.1, desc="Loading configuration...")
+        # progress(0.1, desc="Loading configuration...")
         with open(Path().resolve() / "hf_token.json") as f:
             hf_token = json.load(f)["HUGGING_FACE_TOKEN"]
 
         # Initialize models
-        progress(0.2, desc="Initializing LLM...")
+        # progress(0.2, desc="Initializing LLM...")
         llm: HuggingFaceInferenceAPI = HuggingFaceInferenceAPI(
             model_name="deepseek-ai/DeepSeek-V3-0324",
             token=hf_token,
@@ -79,18 +80,13 @@ def build_index_from_file(
             temperature=0.1,
         )
 
-        progress(0.4, desc="Initializing embedding model...")
+        progress(0.1, desc="Initializing embedding model...")
         embed_model: HuggingFaceInferenceAPIEmbedding = HuggingFaceInferenceAPIEmbedding(
             model_name="sentence-transformers/all-MiniLM-L6-v2", token=hf_token
         )
 
         # Create RAGHelper instance
-        progress(0.5, desc="Creating RAG helper...")
         rag_helper: RAGHelper = RAGHelper(llm=llm, embed_model=embed_model, hf_token=hf_token)
-
-        # Load documents
-        progress(0.6, desc="Preparing document directory...")
-        documents = []
 
         if uploaded_file:
             # Create temporary directory for uploaded files
@@ -98,20 +94,14 @@ def build_index_from_file(
             temp_dir.mkdir(exist_ok=True)
 
             # Copy uploaded files to temp directory
-            progress(0.7, desc="Copying uploaded file...")
+            progress(0.2, desc="Copying uploaded file...")
             if os.path.exists(uploaded_file):
-                import shutil
 
                 shutil.copy2(uploaded_file, temp_dir)
-
-            # Load documents from temp directory
-            progress(0.8, desc="Loading documents...")
-            if any(temp_dir.iterdir()):
-                documents.extend(rag_helper.load_documents(directory_path=str(temp_dir)))
-
         # Build index
-        progress(0.9, desc="Building vector index...")
-        rag_helper.build_index(documents)
+        if any(temp_dir.iterdir()):
+            progress(0.6, desc="Building vector index...")
+            rag_helper.build_index(directory_path=str(temp_dir))
 
         progress(1.0, desc="Index build complete!")
         return rag_helper, "Index successfully built ✅"
