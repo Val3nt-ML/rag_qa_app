@@ -4,11 +4,17 @@ import os
 from pathlib import Path
 import shutil
 from typing import Generator
+from urllib import response
 
 import gradio as gr
+from llama_index.core import PromptTemplate
+from llama_index.core.llama_dataset.generator import RagDatasetGenerator
+from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
 from llama_index.embeddings.huggingface import HuggingFaceInferenceAPIEmbedding
 from llama_index.llms.huggingface_api import HuggingFaceInferenceAPI
+from llama_index.multi_modal_llms.azure_openai import AzureOpenAIMultiModal
 
+from config import settings
 from retrieval.rag_helper import RAGHelper
 
 
@@ -66,30 +72,36 @@ def build_index_from_file(
     try:
         progress(0, desc="Starting index build...")
 
-        # Load HuggingFace token
-        # progress(0.1, desc="Loading configuration...")
-        with open(Path().resolve() / "hf_token.json") as f:
-            hf_token = json.load(f)["HUGGING_FACE_TOKEN"]
-
         # Initialize models
-        # progress(0.2, desc="Initializing LLM...")
-        llm: HuggingFaceInferenceAPI = HuggingFaceInferenceAPI(
-            model_name="deepseek-ai/DeepSeek-V3-0324",
-            token=hf_token,
-            provider="auto",
-            temperature=0.1,
+        progress(0.1, desc="Initializing LLM ...")
+
+        llm: AzureOpenAIMultiModal = AzureOpenAIMultiModal(
+            use_azure_ad=False,
+            engine=settings.rag.llm_model,
+            model=settings.rag.llm_model,
+            azure_endpoint=settings.azure.endpoint,
+            api_version=settings.azure.api_version,
+            api_key=settings.azure.api_key,
         )
 
-        progress(0.1, desc="Initializing embedding model...")
-        embed_model: HuggingFaceInferenceAPIEmbedding = HuggingFaceInferenceAPIEmbedding(
-            model_name="sentence-transformers/all-MiniLM-L6-v2", token=hf_token
+        embed_model: AzureOpenAIEmbedding = AzureOpenAIEmbedding(
+            model=settings.rag.embed_model,
+            azure_endpoint=settings.azure.endpoint,
+            api_version=settings.azure.api_version,
+            api_key=settings.azure.api_key,
         )
+
+        # embed_model = HuggingFaceInferenceAPIEmbedding(
+        #     model_name="google/embeddinggemma-300m",
+        #     token=hf_token,
+        #     provider="auto",  # this will use the best provider available
+        # )
 
         # Create RAGHelper instance
-        rag_helper: RAGHelper = RAGHelper(llm=llm, embed_model=embed_model, hf_token=hf_token)
+        rag_helper: RAGHelper = RAGHelper(llm=llm, embed_model=embed_model)
 
         if uploaded_file:
-            # Create temporary directory for uploaded files
+            # Create temporan ry directory for uploaded files
             temp_dir: Path = Path("temp_uploads")
             temp_dir.mkdir(exist_ok=True)
 
@@ -137,9 +149,56 @@ def query_documents(question: str, rag_helper: RAGHelper | None = None) -> str:
         return f"❌ Error processing your question: {str(e)}"
 
 
-def clear_inputs():
-    """Clear all inputs"""
-    return "", None, "", None
+def generate_question_answer_pairs(
+    num_question: int,
+    rag_helper: RAGHelper | None = None,
+) -> str:
+    """
+    Apply the RAG helper query engine to answer a user question.
+
+    Args:
+        question (str): The user's question
+
+    Returns:
+        str: The answer from the RAG system or an error message
+    """
+
+    if rag_helper is None or rag_helper._index is None:
+        return "❌ Error: No index has been built yet. Please build an index first."
+
+    try:
+
+        dataset_generator = RagDatasetGenerator(
+            nodes=rag_helper._nodes[:num_question],
+            llm=rag_helper.llm,  # Explicitly providing the LLM here
+            num_questions_per_chunk=settings.rag.nb_questions_per_chunk,
+            text_question_template=PromptTemplate(
+                """
+### CONTEXT ###
+{context_str}
+---------------------
+### TOPIC ###
+{query_str}
+---------------------
+### INSTRUCTIONS ###
+Based exclusively on the provided CONTEXT, formulate a list of questions related to the TOPIC. Each question must be answerable using only the information given in the text.
+""",
+            ),
+        )
+
+        qa_set = dataset_generator.generate_dataset_from_nodes()
+        qa_pairs = [(r.query, r.reference_answer) for r in qa_set.examples]
+
+        temp_dir: Path = Path("temp_qa")
+        temp_dir.mkdir(exist_ok=True)
+
+        output_file: str = Path(temp_dir / "qa_pairs_list.json").as_posix()
+        with open(output_file, "w", encoding="utf-8") as f:
+            json.dump(qa_pairs, f, indent=2, ensure_ascii=False)
+        return output_file
+
+    except Exception as e:
+        return f"❌ Error processing your question: {str(e)}"
 
 
 # Create the Gradio interface
@@ -174,6 +233,12 @@ with gr.Blocks(title="Document Q&A Interface") as app:
 
     rag_helper: gr.State = gr.State(value=None)
 
+    with gr.Row(visible=True):
+        with gr.Column(scale=1):
+            num_question = gr.Number(label="Nb Questions to generate", value=5, precision=0)
+            generate_btn = gr.Button("Generate and Download Question/Answer pairs")
+        with gr.Column(scale=1):
+            file_output = gr.File(label="Download your JSON file here")
     # Event handlers -------------------------------------------------------------------
     document_input.change(
         fn=update_button_state,
@@ -182,7 +247,7 @@ with gr.Blocks(title="Document Q&A Interface") as app:
             build_index_btn,
             rag_helper,
             index_markdown,
-        ],  # 🔑 Key: The button itself is the output!
+        ],
     )
 
     build_index_btn.click(
@@ -194,7 +259,17 @@ with gr.Blocks(title="Document Q&A Interface") as app:
 
     submit_btn.click(fn=query_documents, inputs=[question_input, rag_helper], outputs=output)
 
-    # clear_btn.click(fn=clear_inputs, outputs=[question_input, document_input, output])
+    # QA Pairs Generation Button
+
+    # Connect the button to the function
+    generate_btn.click(
+        fn=generate_question_answer_pairs,
+        inputs=[
+            rag_helper,
+            num_question,
+        ],
+        outputs=file_output,
+    )
 
     # Examples
     gr.Examples(
@@ -226,7 +301,6 @@ with gr.Blocks(title="Document Q&A Interface") as app:
 
 
 if __name__ == "__main__":
-    print("Starting RAG Application on port 7860 ...")
     # Launch the interface
     app.launch(
         share=False,
