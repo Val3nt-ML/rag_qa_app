@@ -53,12 +53,6 @@ def build_index_from_file(
             api_key=settings.azure.api_key,
         )
 
-        # embed_model = HuggingFaceInferenceAPIEmbedding(
-        #     model_name="google/embeddinggemma-300m",
-        #     token=hf_token,
-        #     provider="auto",  # this will use the best provider available
-        # )
-
         # Create RAGHelper instance
         rag_helper: RAGHelper = RAGHelper(llm=llm, embed_model=embed_model)
 
