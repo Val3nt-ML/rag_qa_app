@@ -12,6 +12,7 @@ with gr.Blocks(title="Document Q&A Interface") as app:
     gr.Markdown("# 📚 Document Question & Answer Interface")
     gr.Markdown("Upload a document and ask a question about it!")
 
+    gr.Markdown("## 1. Upload a Document & Build an Index")
     # Index Builder section ------------------------------------------------------------
     with gr.Row(visible=True):
         with gr.Column():
@@ -26,6 +27,7 @@ with gr.Blocks(title="Document Q&A Interface") as app:
                 value="No Index built yet.", lines=2, interactive=False, label="Index Status"
             )
 
+    gr.Markdown("## 2. Ask questions")
     # User Questions -------------------------------------------------------------------
     with gr.Row(visible=True):
         with gr.Column(scale=1):
@@ -68,6 +70,7 @@ with gr.Blocks(title="Document Q&A Interface") as app:
         output = gr.Textbox(label="Response", lines=15, interactive=False)
 
     # QA Pairs Generation App ----------------------------------------------------------
+    gr.Markdown("## 3. Generate (Question, Answer) set and download it")
     with gr.Row(visible=True):
         with gr.Column(scale=1):
             num_question = gr.Number(label="Nb Questions to generate", value=5, precision=0)
