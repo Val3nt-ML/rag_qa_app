@@ -69,8 +69,8 @@ A Retrieval-Augmented Generation (RAG) application for document-based question a
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/Val3nt-ML/one_file_rag.git
-   cd one_file_rag
+   git clone https://github.com/Val3nt-ML/rag_qa_app.git
+   cd rag_qa_app
    ```
 
 2. **Set up environment variables**:
