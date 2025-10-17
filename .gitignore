@@ -193,3 +193,5 @@ cython_debug/
 *.json
 *.jpg
 *.vscode
+*.lock
+*.sqlite
