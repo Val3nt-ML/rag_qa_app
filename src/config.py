@@ -19,9 +19,17 @@ class Azure(BaseModel):
     api_key: str
 
 
+class App(BaseModel):
+    share: bool
+    server_name: str
+    server_port: int
+    debug: bool
+
+
 class Settings(BaseSettings):
     azure: Azure
     rag: Rag
+    app: App
 
 
 def load_settings(path: Path = Path(Path(__file__).resolve().parent / "config.yaml")) -> Settings:

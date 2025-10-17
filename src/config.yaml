@@ -10,3 +10,8 @@ azure:
   endpoint: https://val-azure-openai.openai.azure.com/
   api_key: 8BKmvYxt7T6CnuWANKrZhrDiUAWoiZge8pGfpD4RmNLmb0cQmuWWJQQJ99BJAC5T7U2XJ3w3AAABACOGWAcd
  
+app:
+  share: False
+  server_name: "0.0.0.0"
+  server_port: 7860
+  debug: True
