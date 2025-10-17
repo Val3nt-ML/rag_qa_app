@@ -1,12 +1,23 @@
 import os
-from pathlib import Path
 
-from llama_index.core import PromptTemplate, SimpleDirectoryReader, VectorStoreIndex
+from llama_index.core import (
+    PromptTemplate,
+    SimpleDirectoryReader,
+    StorageContext,
+    VectorStoreIndex,
+)
 from llama_index.core.base.base_query_engine import BaseQueryEngine
-from llama_index.core.node_parser import MarkdownNodeParser, SentenceSplitter
+from llama_index.core.indices import MultiModalVectorStoreIndex
+from llama_index.core.node_parser import (
+    MarkdownNodeParser,
+    SentenceSplitter,
+    SimpleNodeParser,
+)
 from llama_index.core.schema import BaseNode, Document, ImageDocument
+from llama_index.vector_stores.qdrant import QdrantVectorStore
 import pymupdf4llm
 from pymupdf4llm.llama.pdf_markdown_reader import PDFMarkdownReader
+import qdrant_client
 import tiktoken
 
 from config import settings
@@ -56,9 +67,28 @@ class RAGHelper:
         )
         self._index: VectorStoreIndex | None = None
         self.similarity_top_k: int = settings.rag.similarity_top_k
-        self.chunk_size: int = settings.rag.llm_model_context_window
-        self.chunk_overlap: int = int(self.chunk_size / 10)  # 10% overlap
+        self.image_similarity_top_k: int = settings.rag.image_similarity_top_k
+        self.max_chunk_size: int = int(
+            self.llm.metadata.context_window / self.similarity_top_k + 1
+        )
+        self.chunk_overlap: int = int(self.max_chunk_size / 20)  # 5% overlap
         self.llama_reader: PDFMarkdownReader = pymupdf4llm.LlamaMarkdownReader()
+        self.client = qdrant_client.QdrantClient(path="qdrant_mm_db")
+
+    def compute_text_nodes(self, text_docs: list[Document]) -> list[BaseNode]:
+        splitter: MarkdownNodeParser = MarkdownNodeParser(
+            include_metadata=True, include_prev_next_rel=True
+        )
+        nodes = splitter.get_nodes_from_documents(text_docs)
+        tokenizer_encoder = tiktoken.encoding_for_model(self.llm.model)
+
+        # 2nd split to check that none node go beyond the context window of used LLM
+        token_aware_splitter = SentenceSplitter(
+            chunk_size=self.max_chunk_size,  # Max tokens per chunk
+            chunk_overlap=self.chunk_overlap,
+            tokenizer=tokenizer_encoder.encode,
+        )
+        return token_aware_splitter.get_nodes_from_documents(nodes)
 
     def _compute_nodes(self, directory_path: str) -> None:
         """Compute nodes from a documents in a directory"""
@@ -84,40 +114,38 @@ class RAGHelper:
         # Add generated images to the documents list
         docs.extend(SimpleDirectoryReader(images_path, required_exts=[".png"]).load_data())
 
-        # Split Text and Image documents
+        # Compute Text & Image Nodes
         text_docs: list[Document] = [d for d in docs if isinstance(d, Document)]
+        text_nodes: list[BaseNode] = self.compute_text_nodes(text_docs)
+
         image_docs: list[ImageDocument] = [d for d in docs if isinstance(d, ImageDocument)]
+        img_node_parser = SimpleNodeParser()
+        img_nodes: list[BaseNode] = img_node_parser.get_nodes_from_documents(image_docs)
 
-        # TODO see if I can find a multimodal embedding model to handle both text and images
-
-        splitter: MarkdownNodeParser = MarkdownNodeParser(
-            include_metadata=True, include_prev_next_rel=True
-        )
-
-        nodes: list[BaseNode] = splitter.get_nodes_from_documents(text_docs)
-
-        # Check that none node go beyond the context window of used LLM,
-        # otherwise chunk it again
-
-        tokenizer_encoder = tiktoken.encoding_for_model(self.llm.model)
-        # TODO Check if it let chunks that are under chunk_size
-        token_aware_splitter = SentenceSplitter(
-            chunk_size=self.chunk_size,  # Max tokens per chunk
-            chunk_overlap=self.chunk_overlap,
-            tokenizer=tokenizer_encoder.encode,
-        )
-        final_nodes: list[BaseNode] = token_aware_splitter.get_nodes_from_documents(nodes)
-        self._nodes: list[BaseNode] = final_nodes
+        self._nodes: list[BaseNode] = text_nodes + img_nodes
+        self._text_nodes: list[BaseNode] = text_nodes
+        self._image_nodes: list[BaseNode] = img_nodes
 
     def build_index(self, directory_path: str) -> None:
         """
         Compute Nodes from directory then build corresponding index
         """
         self._compute_nodes(directory_path=directory_path)
-        self._index = VectorStoreIndex(
-            nodes=self._nodes,
+
+        text_store: QdrantVectorStore = QdrantVectorStore(
+            client=self.client, collection_name="text_collection"
+        )
+        image_store: QdrantVectorStore = QdrantVectorStore(
+            client=self.client, collection_name="image_collection"
+        )
+        storage_context = StorageContext.from_defaults(
+            vector_store=text_store, image_store=image_store
+        )
+
+        self._index = MultiModalVectorStoreIndex(
+            self._nodes,
+            storage_context=storage_context,
             embed_model=self.embed_model,
-            insert_batch_size=1,  # Depends on embedding model
         )
 
     def get_query_engine(self) -> BaseQueryEngine:
@@ -130,4 +158,5 @@ class RAGHelper:
             llm=self.llm,
             text_qa_template=self.text_qa_template,
             similarity_top_k=self.similarity_top_k,
+            image_similarity_top_k=self.image_similarity_top_k,
         )

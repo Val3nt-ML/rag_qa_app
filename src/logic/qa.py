@@ -32,8 +32,11 @@ def generate_question_answer_pairs(
             nl_lst.append(len(rag_helper._nodes[i].text))
 
         # Filter out nodes that don't have "enough" text, that may correspond to only metadata information
-        # Here I arbitrarily chose to filter out first 20%
-        filtered_nodes = [n for n in rag_helper._nodes if len(n.text) >= np.percentile(nl_lst, 20)]
+        filtered_nodes = [
+            n
+            for n in rag_helper._nodes
+            if len(n.text) >= np.percentile(nl_lst, settings.qa_generator.percentile_threshold)
+        ]
 
         if num_question > len(filtered_nodes) * settings.rag.nb_questions_per_chunk:
             return "❌ Nb questions too High ! Reduce either the number of questions to generate or increase the number of questions per chunk."
@@ -68,7 +71,10 @@ Here are some examples of good questions:
         )
 
         qa_set = dataset_generator.generate_dataset_from_nodes()
-        qa_pairs = [(r.query, r.reference_contexts[0]) for r in qa_set.examples]
+        qa_pairs = [
+            {"question": r.query, "answer": r.reference_answer, "context": r.reference_contexts}
+            for r in qa_set.examples
+        ]
 
         temp_dir: Path = Path("temp_qa")
         temp_dir.mkdir(exist_ok=True)

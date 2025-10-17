@@ -1,10 +1,10 @@
 rag:
   nb_questions_per_chunk: 1
-  similarity_top_k: 5
+  similarity_top_k: 3
+  image_similarity_top_k: 2
   embed_model: text-embedding-3-small
   llm:
     model_name: gpt-4o-mini
-    context_window: 128000
     temperature: 0
 
 azure:
@@ -12,6 +12,9 @@ azure:
   endpoint: https://val-azure-openai.openai.azure.com/
   api_key: 8BKmvYxt7T6CnuWANKrZhrDiUAWoiZge8pGfpD4RmNLmb0cQmuWWJQQJ99BJAC5T7U2XJ3w3AAABACOGWAcd
  
+qa_generator:
+  percentile_threshold: 35
+
 app:
   share: False
   server_name: "0.0.0.0"

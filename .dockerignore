@@ -1,0 +1,76 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yaml
+docker-compose.yml
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.venv
+.env
+
+# Testing and development
+tests/
+.pytest_cache/
+.mypy_cache/
+.hypothesis/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Temporary files
+temp_uploads/
+*.tmp
+*.temp
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+
+# Notebooks (unless needed in production)
+notebooks/
+*.ipynb
+
+# Data files (unless needed in production)
+data/
+models/
+
+# Configuration files that shouldn't be in image
+.env.local
+.env.development
+.env.test
+setup.cfg
+pyproject.toml
+Makefile

@@ -101,7 +101,7 @@ with gr.Blocks(title="Document Q&A Interface") as app:
 
     # User Query button
     submit_btn.click(fn=query_documents, inputs=[question_input, rag_helper], outputs=output)
-    clear_btn.click(fn=lambda _: None, outputs=question_input)
+    clear_btn.click(fn=lambda _: (None, None), outputs=[question_input, output])
 
     # Question/Answer generation button
     generate_btn.click(

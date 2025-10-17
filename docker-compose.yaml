@@ -1,21 +1,19 @@
 services:
-
   rag_app:
-    image: rag_app
-    build: .
+    image: rag_app:latest
+    build: 
+      context: .
     environment:
       - PYTHONPATH=/app/src
-      - NUM_QUESTIONS_PER_CHUNK=1
-      - LLM_MODEL=gpt-4o-mini
-      - LLM_MODEL_CONTEXT_WINDOW=128000
-      - EMBED_MODEL=text-embedding-3-small
-      - API_VERSION=2024-10-21
-      - AZURE_ENDPOINT=https://val-azure-openai.openai.azure.com/
-      - API_KEY=8BKmvYxt7T6CnuWANKrZhrDiUAWoiZge8pGfpD4RmNLmb0cQmuWWJQQJ99BJAC5T7U2XJ3w3AAABACOGWAcd
-      - SIMILARITY_TOP_K=5
     command: python /app/src/app.py
     ports:
       - "7860:7860"
     volumes:
       - ./src:/app/src
-      - ./hf_token.json:/app/hf_token.json
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

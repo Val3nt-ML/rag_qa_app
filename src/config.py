@@ -7,13 +7,13 @@ import yaml
 
 class LLM(BaseModel):
     model_name: str
-    context_window: int
     temperature: float
 
 
 class Rag(BaseModel):
     nb_questions_per_chunk: int
     similarity_top_k: int
+    image_similarity_top_k: int
     llm: LLM
     embed_model: str
 
@@ -31,9 +31,14 @@ class App(BaseModel):
     debug: bool
 
 
+class QAGenerator(BaseModel):
+    percentile_threshold: int
+
+
 class Settings(BaseSettings):
     azure: Azure
     rag: Rag
+    qa_generator: QAGenerator
     app: App
 
 

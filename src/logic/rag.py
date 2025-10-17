@@ -43,6 +43,9 @@ def build_index_from_file(
             temperature=settings.rag.llm.temperature,
         )
 
+        # Log the model's context window for debugging
+        progress(0.15, desc=f"Model context window: {llm.metadata.context_window} tokens")
+
         embed_model: AzureOpenAIEmbedding = AzureOpenAIEmbedding(
             model=settings.rag.embed_model,
             azure_endpoint=settings.azure.endpoint,
@@ -101,8 +104,7 @@ def query_documents(question: str, rag_helper: RAGHelper | None = None) -> str:
     try:
         query_engine = rag_helper.get_query_engine()
         response = query_engine.query(question)
-        return f"""**Question:** {question}
-🤖 **Answer:** {str(response)}"""
+        return str(response)
 
     except Exception as e:
         return f"❌ Error processing your question: {str(e)}"
