@@ -10,7 +10,6 @@ services:
       - "7860:7860"
     volumes:
       - ./src:/app/src
-    restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:7860/"]
       interval: 30s
