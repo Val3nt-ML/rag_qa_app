@@ -5,11 +5,16 @@ from pydantic_settings import BaseSettings
 import yaml
 
 
+class LLM(BaseModel):
+    model_name: str
+    context_window: int
+    temperature: float
+
+
 class Rag(BaseModel):
     nb_questions_per_chunk: int
     similarity_top_k: int
-    llm_model: str
-    llm_model_context_window: int
+    llm: LLM
     embed_model: str
 
 

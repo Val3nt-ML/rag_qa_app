@@ -1,9 +1,11 @@
 rag:
   nb_questions_per_chunk: 1
   similarity_top_k: 5
-  llm_model: gpt-4o-mini
-  llm_model_context_window: 128000
   embed_model: text-embedding-3-small
+  llm:
+    model_name: gpt-4o-mini
+    context_window: 128000
+    temperature: 0
 
 azure:
   api_version: "2024-10-21"

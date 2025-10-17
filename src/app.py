@@ -37,35 +37,35 @@ with gr.Blocks(title="Document Q&A Interface") as app:
             with gr.Row():
                 submit_btn = gr.Button("Submit", variant="primary")
                 clear_btn = gr.Button("Clear", variant="secondary")
-        output = gr.Textbox(label="Response", lines=15, interactive=False)
 
-        # Examples of question
-        gr.Examples(
-            examples=[
-                [
-                    "Quelles sont les exigences minimum requises pour les dispositifs d’isolation?",
-                    None,
+            # Examples of question
+            gr.Examples(
+                examples=[
+                    [
+                        "Quelles sont les exigences minimum requises pour les dispositifs d’isolation?",
+                        None,
+                    ],
+                    [
+                        "Fournit un récapitulatif des dispositifs réglementaires applicables dans le document (de préférence sous forme de matrice) ?",
+                        None,
+                    ],
+                    [
+                        "A quel phase d’un projet d’isolation doit être remis le rapport d’étanchéité de l’air ? ",
+                        None,
+                    ],
+                    [
+                        "Quels sont les différents livrables du management de la qualité en phase DCE?",
+                        None,
+                    ],
+                    ["Quels sont les cibles prioritaires HQE pour les crèches?", None],
+                    [
+                        "Fournit un récapitulatif des comptages chauffage au 30 mai 2016 au format JSON.",
+                        None,
+                    ],
                 ],
-                [
-                    "Fournit un récapitulatif des dispositifs réglementaires applicables dans le document (de préférence sous forme de matrice) ?",
-                    None,
-                ],
-                [
-                    "A quel phase d’un projet d’isolation doit être remis le rapport d’étanchéité de l’air ? ",
-                    None,
-                ],
-                [
-                    "Quels sont les différents livrables du management de la qualité en phase DCE?",
-                    None,
-                ],
-                ["Quels sont les cibles prioritaires HQE pour les crèches?", None],
-                [
-                    "Fournit un récapitulatif des comptages chauffage au 30 mai 2016 au format JSON.",
-                    None,
-                ],
-            ],
-            inputs=[question_input, document_input],
-        )
+                inputs=[question_input, document_input],
+            )
+        output = gr.Textbox(label="Response", lines=15, interactive=False)
 
     # QA Pairs Generation App ----------------------------------------------------------
     with gr.Row(visible=True):
@@ -98,6 +98,7 @@ with gr.Blocks(title="Document Q&A Interface") as app:
 
     # User Query button
     submit_btn.click(fn=query_documents, inputs=[question_input, rag_helper], outputs=output)
+    clear_btn.click(fn=lambda _: None, outputs=question_input)
 
     # Question/Answer generation button
     generate_btn.click(

@@ -3,6 +3,7 @@ from pathlib import Path
 
 from llama_index.core import PromptTemplate
 from llama_index.core.llama_dataset.generator import RagDatasetGenerator
+import numpy as np
 
 from config import settings
 from retrieval.rag_helper import RAGHelper
@@ -26,27 +27,48 @@ def generate_question_answer_pairs(
         return "❌ Error: No index has been built yet. Please build an index first."
 
     try:
+        nl_lst = []
+        for i in range(len(rag_helper._nodes)):
+            nl_lst.append(len(rag_helper._nodes[i].text))
+
+        # Filter out nodes that don't have "enough" text, that may correspond to only metadata information
+        # Here I arbitrarily chose to filter out first 20%
+        filtered_nodes = [n for n in rag_helper._nodes if len(n.text) >= np.percentile(nl_lst, 20)]
+
+        if num_question > len(filtered_nodes) * settings.rag.nb_questions_per_chunk:
+            return "❌ Nb questions too High ! Reduce either the number of questions to generate or increase the number of questions per chunk."
 
         dataset_generator = RagDatasetGenerator(
-            nodes=rag_helper._nodes[:num_question],
+            nodes=filtered_nodes[:num_question],
             llm=rag_helper.llm,  # Explicitly providing the LLM here
             num_questions_per_chunk=settings.rag.nb_questions_per_chunk,
+            question_gen_query="You are an engineer specialized in building domain. Your role is to generate {num_questions_per_chunk} technical questions about information provided in the **CONTEXT** section below.",
             text_question_template=PromptTemplate(
                 """
+### TASK ###
+{query_str}
+
 ### CONTEXT ###
 {context_str}
----------------------
-### TOPIC ###
-{query_str}
----------------------
+
 ### INSTRUCTIONS ###
-Based exclusively on the provided CONTEXT, formulate a list of questions related to the TOPIC. Each question must be answerable using only the information given in the text.
+- Restrict the questions to the **CONTEXT** section information provided
+- Each question **must be in French**.
+- Each question must be answerable using **only** the information given in the text.
+- **Don't generate** question related to metadata information like a number of pages, document name,  document file path, size or author.
+
+### EXAMPLES ###
+Here are some examples of good questions:
+- "Quelles sont les exigences minimum requises pour les dispositifs d’isolation?"
+- "Fournit un récapitulatif des dispositifs réglementaires applicables dans le document (de préférence sous forme de matrice) ?"
+- "A quel phase d’un projet d’isolation doit être remis le rapport d’étanchéité de l’air ? "
+- "Quels sont les différents livrables du management de la qualité en phase DCE?"
 """,
             ),
         )
 
         qa_set = dataset_generator.generate_dataset_from_nodes()
-        qa_pairs = [(r.query, r.reference_answer) for r in qa_set.examples]
+        qa_pairs = [(r.query, r.reference_contexts[0]) for r in qa_set.examples]
 
         temp_dir: Path = Path("temp_qa")
         temp_dir.mkdir(exist_ok=True)

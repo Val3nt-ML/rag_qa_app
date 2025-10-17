@@ -35,11 +35,12 @@ def build_index_from_file(
 
         llm: AzureOpenAIMultiModal = AzureOpenAIMultiModal(
             use_azure_ad=False,
-            engine=settings.rag.llm_model,
-            model=settings.rag.llm_model,
+            engine=settings.rag.llm.model_name,
+            model=settings.rag.llm.model_name,
             azure_endpoint=settings.azure.endpoint,
             api_version=settings.azure.api_version,
             api_key=settings.azure.api_key,
+            temperature=settings.rag.llm.temperature,
         )
 
         embed_model: AzureOpenAIEmbedding = AzureOpenAIEmbedding(

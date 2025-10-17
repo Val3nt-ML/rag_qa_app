@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 from llama_index.core import PromptTemplate, SimpleDirectoryReader, VectorStoreIndex
 from llama_index.core.base.base_query_engine import BaseQueryEngine
@@ -62,6 +63,8 @@ class RAGHelper:
     def _compute_nodes(self, directory_path: str) -> None:
         """Compute nodes from a documents in a directory"""
 
+        images_path: str = directory_path + "/images/"
+
         docs = []
         # Load PDF documents, convert them to markdown and write images into the same directory
         for file in [
@@ -72,14 +75,14 @@ class RAGHelper:
             docs.extend(
                 self.llama_reader.load_data(
                     file_path=os.path.join(directory_path, file),
-                    image_path=directory_path,
+                    image_path=images_path,
                     write_images=True,
                     image_format="png",
                 )
             )
 
         # Add generated images to the documents list
-        docs.extend(SimpleDirectoryReader(directory_path, required_exts=[".png"]).load_data())
+        docs.extend(SimpleDirectoryReader(images_path, required_exts=[".png"]).load_data())
 
         # Split Text and Image documents
         text_docs: list[Document] = [d for d in docs if isinstance(d, Document)]
@@ -102,7 +105,6 @@ class RAGHelper:
             chunk_size=self.chunk_size,  # Max tokens per chunk
             chunk_overlap=self.chunk_overlap,
             tokenizer=tokenizer_encoder.encode,
-            include_metadata=True,
         )
         final_nodes: list[BaseNode] = token_aware_splitter.get_nodes_from_documents(nodes)
         self._nodes: list[BaseNode] = final_nodes
