@@ -10,7 +10,7 @@ A Retrieval-Augmented Generation (RAG) application for document-based question a
 
 - 📄 **Document Upload**: Support for multiple formats (.txt, .pdf, .docx, .md)
 - 🔍 **Intelligent Search**: Vector-based document retrieval using embeddings
-- 🤖 **AI-Powered Q&A**: Question answering using OpenAI GPT models
+- 🤖 **AI-Powered Q&A**: Question answering using HuggingFace OpenSource models
 - 📊 **Q&A Generation**: Automatic generation of question-answer pairs from documents
 - 🐳 **Docker Support**: Containerized deployment with Docker Compose
 - 🌐 **Web Interface**: Intuitive Gradio-based web interface
