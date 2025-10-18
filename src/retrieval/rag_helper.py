@@ -72,7 +72,9 @@ class RAGHelper:
         # self.max_chunk_size: int = int(
         #     self.llm.metadata.context_window / self.similarity_top_k + 1
         # )
-        self.max_chunk_size: int = 1024
+        self.max_chunk_size: int = (
+            settings.rag.max_chunk_size
+        )  # Arbitrarily set to prevent payload overload issues
         self.chunk_overlap: int = int(self.max_chunk_size / 20)  # 5% overlap
         self.llama_reader: PDFMarkdownReader = pymupdf4llm.LlamaMarkdownReader()
         self.client = qdrant_client.QdrantClient(path="qdrant_mm_db")
@@ -109,7 +111,7 @@ class RAGHelper:
         )
         nodes = splitter.get_nodes_from_documents(text_docs)
 
-        tokenizer_encoder = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct")
+        tokenizer_encoder = AutoTokenizer.from_pretrained(settings.rag.llm.model)
 
         # 2nd split to check that none node go beyond the context window of used LLM
         token_aware_splitter = SentenceSplitter(
@@ -139,9 +141,9 @@ class RAGHelper:
                 self.llama_reader.load_data(
                     file_path=os.path.join(directory_path, file),
                     image_path=images_path,
-                    write_images=True,
-                    embed_images=False,
-                    image_format="png",
+                    write_images=settings.rag.write_images,
+                    embed_images=settings.rag.embed_images,
+                    image_format=settings.rag.image_format,
                 )
             )
 

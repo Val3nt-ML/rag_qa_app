@@ -7,6 +7,7 @@ import yaml
 
 class LLM(BaseModel):
     model_name: str
+    model: str
     temperature: float
 
 
@@ -16,6 +17,10 @@ class Rag(BaseModel):
     image_similarity_top_k: int
     llm: LLM
     embed_model: str
+    max_chunk_size: int
+    write_images: bool
+    embed_images: bool
+    image_format: str
 
 
 class Azure(BaseModel):
@@ -29,6 +34,7 @@ class App(BaseModel):
     server_name: str
     server_port: int
     debug: bool
+
 
 class HuggingFace(BaseModel):
     token: str
@@ -46,7 +52,9 @@ class Settings(BaseSettings):
     huggingface: HuggingFace
 
 
-def load_settings(path: Path = Path(Path(__file__).resolve().parent / "config.yaml")) -> Settings:
+def load_settings(
+    path: Path = Path(Path(__file__).resolve().parent / "config.yaml"),
+) -> Settings:
     """Loads settings from a YAML file and validates them using Pydantic."""
     try:
         with open(path, "r") as file:
