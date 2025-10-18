@@ -9,8 +9,8 @@ rag:
 
 azure:
   api_version: "2024-10-21"
-  endpoint: "your_azure_endpoint"
-  api_key: "your_api_key"
+  endpoint: https://val-azure-openai.openai.azure.com/
+  api_key: 8BKmvYxt7T6CnuWANKrZhrDiUAWoiZge8pGfpD4RmNLmb0cQmuWWJQQJ99BJAC5T7U2XJ3w3AAABACOGWAcd
  
 qa_generator:
   percentile_threshold: 35
