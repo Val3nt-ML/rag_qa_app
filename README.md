@@ -114,7 +114,7 @@ A Retrieval-Augmented Generation (RAG) application for document-based question a
 The application is configured through `src/config.yaml`:
 
 - **RAG Settings**: Embedding models, similarity thresholds, LLM parameters
-- **Azure OpenAI**: API endpoints and authentication
+- **HuggingFace Inference Endpoint**: API endpoints and authentication
 - **Application**: Server settings, debug mode, sharing options
 - **Q&A Generation**: Automated question generation parameters
 
