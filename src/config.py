@@ -30,6 +30,9 @@ class App(BaseModel):
     server_port: int
     debug: bool
 
+class HuggingFace(BaseModel):
+    token: str
+
 
 class QAGenerator(BaseModel):
     percentile_threshold: int
@@ -40,6 +43,7 @@ class Settings(BaseSettings):
     rag: Rag
     qa_generator: QAGenerator
     app: App
+    huggingface: HuggingFace
 
 
 def load_settings(path: Path = Path(Path(__file__).resolve().parent / "config.yaml")) -> Settings:

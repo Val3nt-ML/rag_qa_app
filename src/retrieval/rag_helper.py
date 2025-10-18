@@ -1,4 +1,5 @@
 import os
+import re
 
 from llama_index.core import (
     PromptTemplate,
@@ -13,12 +14,12 @@ from llama_index.core.node_parser import (
     SentenceSplitter,
     SimpleNodeParser,
 )
-from llama_index.core.schema import BaseNode, Document, ImageDocument
+from llama_index.core.schema import BaseNode, Document, ImageDocument, TextNode
 from llama_index.vector_stores.qdrant import QdrantVectorStore
 import pymupdf4llm
 from pymupdf4llm.llama.pdf_markdown_reader import PDFMarkdownReader
 import qdrant_client
-import tiktoken
+from transformers import AutoTokenizer
 
 from config import settings
 
@@ -68,19 +69,47 @@ class RAGHelper:
         self._index: VectorStoreIndex | None = None
         self.similarity_top_k: int = settings.rag.similarity_top_k
         self.image_similarity_top_k: int = settings.rag.image_similarity_top_k
-        self.max_chunk_size: int = int(
-            self.llm.metadata.context_window / self.similarity_top_k + 1
-        )
+        # self.max_chunk_size: int = int(
+        #     self.llm.metadata.context_window / self.similarity_top_k + 1
+        # )
+        self.max_chunk_size: int = 1024
         self.chunk_overlap: int = int(self.max_chunk_size / 20)  # 5% overlap
         self.llama_reader: PDFMarkdownReader = pymupdf4llm.LlamaMarkdownReader()
         self.client = qdrant_client.QdrantClient(path="qdrant_mm_db")
+
+    @staticmethod
+    def clean_text_node_content(nodes: list[TextNode]) -> list[TextNode]:
+        """
+        Clean the content of TextNodes by removing markdown image links that can cause
+        issues during question generation.
+
+        :param nodes: Description
+        :type nodes: list[TextNode]
+        :return: Description
+        :rtype: list[TextNode]
+        """
+        # Regex to find and remove Markdown image links: ![*](*)
+        markdown_image_regex = r"!\[.*?\]\(.*?\)"
+
+        cleaned_nodes = []
+        for node in nodes:
+            original_content = node.get_content()
+            # Remove all markdown image links from the text
+            cleaned_content = re.sub(
+                markdown_image_regex, "", original_content, flags=re.DOTALL
+            )
+            node.set_content(cleaned_content)
+
+            cleaned_nodes.append(node)
+        return cleaned_nodes
 
     def compute_text_nodes(self, text_docs: list[Document]) -> list[BaseNode]:
         splitter: MarkdownNodeParser = MarkdownNodeParser(
             include_metadata=True, include_prev_next_rel=True
         )
         nodes = splitter.get_nodes_from_documents(text_docs)
-        tokenizer_encoder = tiktoken.encoding_for_model(self.llm.model)
+
+        tokenizer_encoder = AutoTokenizer.from_pretrained("Qwen/Qwen2.5-VL-7B-Instruct")
 
         # 2nd split to check that none node go beyond the context window of used LLM
         token_aware_splitter = SentenceSplitter(
@@ -88,7 +117,11 @@ class RAGHelper:
             chunk_overlap=self.chunk_overlap,
             tokenizer=tokenizer_encoder.encode,
         )
-        return token_aware_splitter.get_nodes_from_documents(nodes)
+        splitted_nodes: list[BaseNode] = token_aware_splitter.get_nodes_from_documents(
+            nodes
+        )
+
+        return RAGHelper.clean_text_node_content(splitted_nodes)
 
     def _compute_nodes(self, directory_path: str) -> None:
         """Compute nodes from a documents in a directory"""
@@ -107,19 +140,24 @@ class RAGHelper:
                     file_path=os.path.join(directory_path, file),
                     image_path=images_path,
                     write_images=True,
+                    embed_images=False,
                     image_format="png",
                 )
             )
 
         # Add generated images to the documents list
-        docs.extend(SimpleDirectoryReader(images_path, required_exts=[".png"]).load_data())
+        docs.extend(
+            SimpleDirectoryReader(images_path, required_exts=[".png"]).load_data()
+        )
 
         # Compute Text & Image Nodes
         text_docs: list[Document] = [d for d in docs if isinstance(d, Document)]
         text_nodes: list[BaseNode] = self.compute_text_nodes(text_docs)
 
-        image_docs: list[ImageDocument] = [d for d in docs if isinstance(d, ImageDocument)]
-        img_node_parser = SimpleNodeParser()
+        image_docs: list[ImageDocument] = [
+            d for d in docs if isinstance(d, ImageDocument)
+        ]
+        img_node_parser: SimpleNodeParser = SimpleNodeParser()
         img_nodes: list[BaseNode] = img_node_parser.get_nodes_from_documents(image_docs)
 
         self._nodes: list[BaseNode] = text_nodes + img_nodes
@@ -146,6 +184,7 @@ class RAGHelper:
             self._nodes,
             storage_context=storage_context,
             embed_model=self.embed_model,
+            insert_batch_size=512,
         )
 
     def get_query_engine(self) -> BaseQueryEngine:

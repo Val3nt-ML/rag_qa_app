@@ -1,8 +1,10 @@
 import json
 from pathlib import Path
+import re
 
 from llama_index.core import PromptTemplate
 from llama_index.core.llama_dataset.generator import RagDatasetGenerator
+from llama_index.core.schema import ImageNode, TextNode
 import numpy as np
 
 from config import settings
@@ -29,20 +31,25 @@ def generate_question_answer_pairs(
     try:
         nl_lst = []
         for i in range(len(rag_helper._nodes)):
-            nl_lst.append(len(rag_helper._nodes[i].text))
+            if isinstance(rag_helper._nodes[i], TextNode):
+                nl_lst.append(len(rag_helper._nodes[i].text))
 
         # Filter out nodes that don't have "enough" text, that may correspond to only metadata information
-        filtered_nodes = [
+        txt_filtered_nodes: list[TextNode] = [
             n
-            for n in rag_helper._nodes
-            if len(n.text) >= np.percentile(nl_lst, settings.qa_generator.percentile_threshold)
+            for n in [m for m in rag_helper._nodes if isinstance(m, TextNode)]
+            if len(n.text)
+            >= np.percentile(nl_lst, settings.qa_generator.percentile_threshold)
         ]
 
-        if num_question > len(filtered_nodes) * settings.rag.nb_questions_per_chunk:
+        final_nodes: list[TextNode | ImageNode] = txt_filtered_nodes.copy()
+        final_nodes.extend([n for n in rag_helper._nodes if isinstance(n, ImageNode)])
+
+        if num_question > len(final_nodes) * settings.rag.nb_questions_per_chunk:
             return "❌ Nb questions too High ! Reduce either the number of questions to generate or increase the number of questions per chunk."
 
         dataset_generator = RagDatasetGenerator(
-            nodes=filtered_nodes[:num_question],
+            nodes=final_nodes[:num_question],
             llm=rag_helper.llm,  # Explicitly providing the LLM here
             num_questions_per_chunk=settings.rag.nb_questions_per_chunk,
             question_gen_query="You are an engineer specialized in building domain. Your role is to generate {num_questions_per_chunk} technical questions about information provided in the **CONTEXT** section below.",
@@ -72,7 +79,11 @@ Here are some examples of good questions:
 
         qa_set = dataset_generator.generate_dataset_from_nodes()
         qa_pairs = [
-            {"question": r.query, "answer": r.reference_answer, "context": r.reference_contexts}
+            {
+                "question": r.query,
+                "answer": r.reference_answer,
+                "context": r.reference_contexts,
+            }
             for r in qa_set.examples
         ]
 

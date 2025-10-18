@@ -3,8 +3,8 @@ from pathlib import Path
 import shutil
 
 import gradio as gr
-from llama_index.embeddings.azure_openai import AzureOpenAIEmbedding
-from llama_index.multi_modal_llms.azure_openai import AzureOpenAIMultiModal
+from llama_index.embeddings.huggingface_api import HuggingFaceInferenceAPIEmbedding
+from llama_index.llms.huggingface_api import HuggingFaceInferenceAPI
 
 from config import settings
 from retrieval.rag_helper import RAGHelper
@@ -33,24 +33,17 @@ def build_index_from_file(
         # Initialize models
         progress(0.1, desc="Initializing LLM ...")
 
-        llm: AzureOpenAIMultiModal = AzureOpenAIMultiModal(
-            use_azure_ad=False,
-            engine=settings.rag.llm.model_name,
+        llm: HuggingFaceInferenceAPI = HuggingFaceInferenceAPI(
             model=settings.rag.llm.model_name,
-            azure_endpoint=settings.azure.endpoint,
-            api_version=settings.azure.api_version,
-            api_key=settings.azure.api_key,
+            token=settings.huggingface.token,
             temperature=settings.rag.llm.temperature,
         )
 
-        # Log the model's context window for debugging
-        progress(0.15, desc=f"Model context window: {llm.metadata.context_window} tokens")
-
-        embed_model: AzureOpenAIEmbedding = AzureOpenAIEmbedding(
-            model=settings.rag.embed_model,
-            azure_endpoint=settings.azure.endpoint,
-            api_version=settings.azure.api_version,
-            api_key=settings.azure.api_key,
+        embed_model: HuggingFaceInferenceAPIEmbedding = (
+            HuggingFaceInferenceAPIEmbedding(
+                model_name=settings.rag.embed_model,
+                token=settings.huggingface.token,
+            )
         )
 
         # Create RAGHelper instance

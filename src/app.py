@@ -24,7 +24,10 @@ with gr.Blocks(title="Document Q&A Interface") as app:
             build_index_btn = gr.Button("Build Index from document", variant="primary")
         with gr.Column():
             index_markdown = gr.Textbox(
-                value="No Index built yet.", lines=2, interactive=False, label="Index Status"
+                value="No Index built yet.",
+                lines=2,
+                interactive=False,
+                label="Index Status",
             )
 
     gr.Markdown("## 2. Ask questions")
@@ -32,7 +35,7 @@ with gr.Blocks(title="Document Q&A Interface") as app:
     with gr.Row(visible=True):
         with gr.Column(scale=1):
             question_input = gr.Textbox(
-                label="Your Question",
+                label="Question",
                 placeholder="What would you like to know about the document?",
                 lines=3,
             )
@@ -73,7 +76,9 @@ with gr.Blocks(title="Document Q&A Interface") as app:
     gr.Markdown("## 3. Generate (Question, Answer) set and download it")
     with gr.Row(visible=True):
         with gr.Column(scale=1):
-            num_question = gr.Number(label="Nb Questions to generate", value=5, precision=0)
+            num_question = gr.Number(
+                label="Nb Questions to generate", value=5, precision=0
+            )
             generate_btn = gr.Button("Generate and Download Question/Answer pairs")
         with gr.Column(scale=1):
             file_output = gr.File(label="Download your JSON file here")
@@ -100,7 +105,9 @@ with gr.Blocks(title="Document Q&A Interface") as app:
     )
 
     # User Query button
-    submit_btn.click(fn=query_documents, inputs=[question_input, rag_helper], outputs=output)
+    submit_btn.click(
+        fn=query_documents, inputs=[question_input, rag_helper], outputs=output
+    )
     clear_btn.click(fn=lambda _: (None, None), outputs=[question_input, output])
 
     # Question/Answer generation button
