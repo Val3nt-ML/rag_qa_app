@@ -73,4 +73,4 @@ def load_settings(path: Path | None = None) -> Settings:
 
 # Create a single, importable instance of the settings for your app
 # This code runs when the module is imported
-settings = load_settings()
+settings: Settings = load_settings()

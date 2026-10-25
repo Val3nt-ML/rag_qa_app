@@ -1,100 +1,116 @@
 import json
+import re
 from pathlib import Path
-from typing import cast
 
 import numpy as np
 from llama_index.core import PromptTemplate
-from llama_index.core.llama_dataset import LabelledRagDataExample
-from llama_index.core.llama_dataset.generator import RagDatasetGenerator
 from llama_index.core.schema import BaseNode, ImageNode, TextNode
 
 from config import settings
 from retrieval.rag_helper import RAGHelper
+
+QUESTION_PROMPT = PromptTemplate(
+    """<role>Tu es un ingénieur spécialisé dans le bâtiment.
+</role>
+
+<task>
+Génère {num_questions} questions techniques en français à partir du CONTEXTE.
+</task>
+
+<constraints>
+- Chaque question doit être répondable uniquement à partir de ce contexte.
+- Ne pose pas de question sur les métadonnées (pages, nom ou chemin du document).
+- Retourne uniquement une liste numérotée de questions, une question par ligne.
+</constraints>
+
+<context>
+{context_str}
+</context>
+"""
+)
 
 
 def generate_question_answer_pairs(
     num_question: int,
     rag_helper: RAGHelper | None = None,
 ) -> str:
-    """
-    Apply the RAG helper query engine to answer a user question.
-
-    Args:
-        question (str): The user's question
-
-    Returns:
-        str: The answer from the RAG system or an error message
-    """
-
+    """Export French question/answer pairs and their source contexts as JSON."""
     if rag_helper is None or rag_helper._index is None:
         return "❌ Error: No index has been built yet. Please build an index first."
 
+    questions_per_chunk = settings.rag.nb_questions_per_chunk
+    if num_question < 1 or questions_per_chunk < 1:
+        return "❌ The number of questions and questions per chunk must be positive."
+
     try:
-        nl_lst = []
-        for node in rag_helper._nodes:
-            if isinstance(node, TextNode):
-                nl_lst.append(len(node.text))
-
-        # Filter out nodes that don't have "enough" text, that may correspond to only metadata information
-        txt_filtered_nodes: list[TextNode] = [
-            n
-            for n in [m for m in rag_helper._nodes if isinstance(m, TextNode)]
-            if len(n.text)
-            >= np.percentile(nl_lst, settings.qa_generator.percentile_threshold)
+        text_nodes = [
+            node
+            for node in rag_helper._nodes
+            if isinstance(node, TextNode)
+            and not isinstance(node, ImageNode)
+            and node.text.strip()
         ]
-
-        final_nodes: list[BaseNode] = list(txt_filtered_nodes)
-        final_nodes.extend([n for n in rag_helper._nodes if isinstance(n, ImageNode)])
-
-        if num_question > len(final_nodes) * settings.rag.nb_questions_per_chunk:
-            return "❌ Nb questions too High ! Reduce either the number of questions to generate or increase the number of questions per chunk."
-
-        dataset_generator = RagDatasetGenerator(
-            nodes=final_nodes[:num_question],
-            llm=rag_helper.llm,  # Explicitly providing the LLM here
-            num_questions_per_chunk=settings.rag.nb_questions_per_chunk,
-            question_gen_query="You are an engineer specialized in building domain. Your role is to generate {num_questions_per_chunk} technical questions about information provided in the **CONTEXT** section below.",
-            text_question_template=PromptTemplate(
-                """
-### TASK ###
-{query_str}
-
-### CONTEXT ###
-{context_str}
-
-### INSTRUCTIONS ###
-- Restrict the questions to the **CONTEXT** section information provided
-- Each question **must be in French**.
-- Each question must be answerable using **only** the information given in the text.
-- **Don't generate** question related to metadata information like a number of pages, document name,  document file path, size or author.
-
-### EXAMPLES ###
-Here are some examples of good questions:
-- "Quelles sont les exigences minimum requises pour les dispositifs d’isolation?"
-- "Fournit un récapitulatif des dispositifs réglementaires applicables dans le document (de préférence sous forme de matrice) ?"
-- "A quel phase d’un projet d’isolation doit être remis le rapport d’étanchéité de l’air ? "
-- "Quels sont les différents livrables du management de la qualité en phase DCE?"
-""",
-            ),
+        final_nodes: list[BaseNode] = []
+        if text_nodes:
+            threshold = np.percentile(
+                [len(node.text) for node in text_nodes],
+                settings.qa_generator.percentile_threshold,
+            )
+            final_nodes.extend(
+                node for node in text_nodes if len(node.text) >= threshold
+            )
+        final_nodes.extend(
+            node
+            for node in rag_helper._nodes
+            if isinstance(node, ImageNode) and node.get_content().strip()
         )
 
-        qa_set = dataset_generator.generate_dataset_from_nodes()
-        qa_pairs = [
-            {
-                "question": r.query,
-                "answer": r.reference_answer,
-                "context": r.reference_contexts,
-            }
-            for r in cast(list[LabelledRagDataExample], qa_set.examples)
-        ]
+        if not final_nodes:
+            return "❌ No text content is available to generate questions."
+        if num_question > len(final_nodes) * questions_per_chunk:
+            return "❌ Nb questions too High ! Reduce either the number of questions to generate or increase the number of questions per chunk."
 
-        temp_dir: Path = Path("temp_qa")
+        # Use the public LLM API instead of the removed llama_dataset module.
+        # Generate per node so each exported answer retains its exact source context.
+        qa_pairs = []
+        for node in final_nodes:
+            remaining = num_question - len(qa_pairs)
+            if remaining == 0:
+                break
+            context = node.get_content()
+            generated = rag_helper.llm.predict(
+                QUESTION_PROMPT,
+                num_questions=min(questions_per_chunk, remaining),
+                context_str=context,
+            )
+            questions = [
+                re.sub(r"^\s*(?:\d+[.)]|[-*•])\s*", "", line).strip()
+                for line in generated.splitlines()
+                if line.strip()
+            ]
+            for question in questions[: min(questions_per_chunk, remaining)]:
+                answer = rag_helper.llm.predict(
+                    rag_helper.text_qa_template,
+                    context_str=context,
+                    query_str=question,
+                )
+                qa_pairs.append(
+                    {
+                        "question": question,
+                        "answer": answer,
+                        "context": [context],
+                    }
+                )
+
+        if len(qa_pairs) != num_question:
+            return "❌ The model generated fewer questions than requested. Please try again."
+
+        temp_dir = Path("temp_qa")
         temp_dir.mkdir(exist_ok=True)
-
-        output_file: str = Path(temp_dir / "qa_pairs_list.json").as_posix()
-        with open(output_file, "w", encoding="utf-8") as f:
-            json.dump(qa_pairs, f, indent=2, ensure_ascii=False)
-        return output_file
+        output_file = temp_dir / "qa_pairs_list.json"
+        with output_file.open("w", encoding="utf-8") as file:
+            json.dump(qa_pairs, file, indent=2, ensure_ascii=False)
+        return output_file.as_posix()
 
     except Exception as e:  # noqa: BLE001 - Surface provider errors in the Gradio UI.
         return f"❌ Error processing your question: {e!s}"

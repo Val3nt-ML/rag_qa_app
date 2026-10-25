@@ -111,6 +111,8 @@ class RAGHelper:
         nodes = splitter.get_nodes_from_documents(text_docs)
 
         tokenizer_encoder = AutoTokenizer.from_pretrained(settings.rag.llm.model)
+        if tokenizer_encoder is None:
+            raise ValueError("Could not load the configured model tokenizer.")
 
         # 2nd split to check that none node go beyond the context window of used LLM
         token_aware_splitter = SentenceSplitter(
