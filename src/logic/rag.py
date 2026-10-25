@@ -1,6 +1,6 @@
 import os
-from pathlib import Path
 import shutil
+from pathlib import Path
 
 import gradio as gr
 from llama_index.embeddings.huggingface_api import HuggingFaceInferenceAPIEmbedding
@@ -9,9 +9,11 @@ from llama_index.llms.huggingface_api import HuggingFaceInferenceAPI
 from config import settings
 from retrieval.rag_helper import RAGHelper
 
+INDEX_PROGRESS = gr.Progress(track_tqdm=True)
+
 
 def build_index_from_file(
-    uploaded_file: str | None = None, progress=gr.Progress(track_tqdm=True)
+    uploaded_file: str | None = None, progress=INDEX_PROGRESS
 ) -> tuple[RAGHelper | None, str]:
     """
     Initialize a RAGHelper instance with a query engine based on uploaded documents.
@@ -26,6 +28,9 @@ def build_index_from_file(
     Raises:
         Exception: If no documents are provided or configuration fails
     """
+
+    if not uploaded_file:
+        raise ValueError("Please upload a document before building the index.")
 
     try:
         progress(0, desc="Starting index build...")
@@ -57,7 +62,6 @@ def build_index_from_file(
             # Copy uploaded files to temp directory
             progress(0.2, desc="Copying uploaded file...")
             if os.path.exists(uploaded_file):
-
                 shutil.copy2(uploaded_file, temp_dir)
         # Build index
         if any(temp_dir.iterdir()):
@@ -68,7 +72,7 @@ def build_index_from_file(
         return rag_helper, "Index successfully built ✅"
 
     except Exception as e:
-        raise Exception(f"Failed to initialize RAG helper: {str(e)}")
+        raise RuntimeError(f"Failed to initialize RAG helper: {e!s}") from e
 
 
 def query_documents(question: str, rag_helper: RAGHelper | None = None) -> str:
@@ -93,5 +97,5 @@ def query_documents(question: str, rag_helper: RAGHelper | None = None) -> str:
         response = query_engine.query(question)
         return str(response)
 
-    except Exception as e:
-        return f"❌ Error processing your question: {str(e)}"
+    except Exception as e:  # noqa: BLE001 - Surface provider errors in the Gradio UI.
+        return f"❌ Error processing your question: {e!s}"

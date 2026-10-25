@@ -1,6 +1,8 @@
 import os
 import re
 
+import pymupdf4llm
+import qdrant_client
 from llama_index.core import (
     PromptTemplate,
     SimpleDirectoryReader,
@@ -16,16 +18,13 @@ from llama_index.core.node_parser import (
 )
 from llama_index.core.schema import BaseNode, Document, ImageDocument, TextNode
 from llama_index.vector_stores.qdrant import QdrantVectorStore
-import pymupdf4llm
 from pymupdf4llm.llama.pdf_markdown_reader import PDFMarkdownReader
-import qdrant_client
 from transformers import AutoTokenizer
 
 from config import settings
 
 
 class RAGHelper:
-
     def __init__(
         self,
         llm,
@@ -119,11 +118,10 @@ class RAGHelper:
             chunk_overlap=self.chunk_overlap,
             tokenizer=tokenizer_encoder.encode,
         )
-        splitted_nodes: list[BaseNode] = token_aware_splitter.get_nodes_from_documents(
-            nodes
-        )
+        splitted_nodes = token_aware_splitter(nodes)
 
-        return RAGHelper.clean_text_node_content(splitted_nodes)
+        text_nodes = [node for node in splitted_nodes if isinstance(node, TextNode)]
+        return list(RAGHelper.clean_text_node_content(text_nodes))
 
     def _compute_nodes(self, directory_path: str) -> None:
         """Compute nodes from a documents in a directory"""

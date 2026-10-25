@@ -1,11 +1,12 @@
 import json
 from pathlib import Path
-import re
+from typing import cast
 
-from llama_index.core import PromptTemplate
-from llama_index.core.llama_dataset.generator import RagDatasetGenerator
-from llama_index.core.schema import ImageNode, TextNode
 import numpy as np
+from llama_index.core import PromptTemplate
+from llama_index.core.llama_dataset import LabelledRagDataExample
+from llama_index.core.llama_dataset.generator import RagDatasetGenerator
+from llama_index.core.schema import BaseNode, ImageNode, TextNode
 
 from config import settings
 from retrieval.rag_helper import RAGHelper
@@ -30,9 +31,9 @@ def generate_question_answer_pairs(
 
     try:
         nl_lst = []
-        for i in range(len(rag_helper._nodes)):
-            if isinstance(rag_helper._nodes[i], TextNode):
-                nl_lst.append(len(rag_helper._nodes[i].text))
+        for node in rag_helper._nodes:
+            if isinstance(node, TextNode):
+                nl_lst.append(len(node.text))
 
         # Filter out nodes that don't have "enough" text, that may correspond to only metadata information
         txt_filtered_nodes: list[TextNode] = [
@@ -42,7 +43,7 @@ def generate_question_answer_pairs(
             >= np.percentile(nl_lst, settings.qa_generator.percentile_threshold)
         ]
 
-        final_nodes: list[TextNode | ImageNode] = txt_filtered_nodes.copy()
+        final_nodes: list[BaseNode] = list(txt_filtered_nodes)
         final_nodes.extend([n for n in rag_helper._nodes if isinstance(n, ImageNode)])
 
         if num_question > len(final_nodes) * settings.rag.nb_questions_per_chunk:
@@ -84,7 +85,7 @@ Here are some examples of good questions:
                 "answer": r.reference_answer,
                 "context": r.reference_contexts,
             }
-            for r in qa_set.examples
+            for r in cast(list[LabelledRagDataExample], qa_set.examples)
         ]
 
         temp_dir: Path = Path("temp_qa")
@@ -95,5 +96,5 @@ Here are some examples of good questions:
             json.dump(qa_pairs, f, indent=2, ensure_ascii=False)
         return output_file
 
-    except Exception as e:
-        return f"❌ Error processing your question: {str(e)}"
+    except Exception as e:  # noqa: BLE001 - Surface provider errors in the Gradio UI.
+        return f"❌ Error processing your question: {e!s}"

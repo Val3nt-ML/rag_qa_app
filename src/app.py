@@ -7,7 +7,6 @@ from logic.rag import query_documents
 
 # Create the Gradio interface
 with gr.Blocks(title="Document Q&A Interface") as app:
-
     rag_helper: gr.State = gr.State(value=None)
     gr.Markdown("# 📚 Document Question & Answer Interface")
     gr.Markdown("Upload a document and ask a question about it!")

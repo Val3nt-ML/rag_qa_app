@@ -146,6 +146,8 @@ celerybeat.pid
 
 # Environments
 .env
+.env.*
+!.env.example
 .venv
 env/
 venv/
@@ -194,4 +196,5 @@ cython_debug/
 *.jpg
 *.vscode
 *.lock
+!uv.lock
 *.sqlite

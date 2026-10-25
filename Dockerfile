@@ -1,5 +1,9 @@
 # Use multi-stage build for optimization
-FROM python:3.13.8-slim as builder
+FROM python:3.13.8-slim AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.10.10 /uv /uvx /bin/
+
+WORKDIR /app
 
 ENV PYTHONPATH=/app/src
 
@@ -9,11 +13,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 
-COPY requirements.txt ./
+COPY pyproject.toml uv.lock ./
 
 
-RUN pip install --upgrade pip uv \
-    && uv pip install --system --no-cache-dir -r requirements.txt
+RUN uv sync --locked --no-dev --no-install-project --no-cache
 
 # ------------------------------------------------------------------------------------
 FROM python:3.13.8-slim
@@ -25,6 +28,7 @@ LABEL maintainer="Valentin LAURENT" \
 
 
 ENV PYTHONPATH=/app/src
+ENV PATH="/app/.venv/bin:$PATH"
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -33,8 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && apt-get clean
 
 # Copy Python packages from builder stage
-COPY --from=builder /usr/local/lib/python3.13/site-packages /usr/local/lib/python3.13/site-packages
-COPY --from=builder /usr/local/bin /usr/local/bin
+COPY --from=builder /app/.venv /app/.venv
 
 WORKDIR /app
 
