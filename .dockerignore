@@ -72,5 +72,4 @@ models/
 .env.development
 .env.test
 setup.cfg
-pyproject.toml
 Makefile

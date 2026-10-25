@@ -2,10 +2,10 @@ rag:
   nb_questions_per_chunk: 1
   similarity_top_k: 3
   image_similarity_top_k: 2
-  embed_model: "your_multimodal_embedding_model_endpoint_or_name"
+  embed_model: https://y81s0ka20u537t50.eu-west-1.aws.endpoints.huggingface.cloud
   llm:
-    model_name: your_multimodal_model_endpoint_or_name
-    model: your_multimodal_name
+    model_name: https://kpzp229id38v1qfl.us-east-1.aws.endpoints.huggingface.cloud
+    model: Qwen/Qwen2.5-VL-7B-Instruct
     temperature: 0.1
   max_chunk_size: 1024
   write_images: True
@@ -13,9 +13,7 @@ rag:
   image_format: png
 
 
-huggingface:
-  token: 
- 
+
 qa_generator:
   percentile_threshold: 35
 

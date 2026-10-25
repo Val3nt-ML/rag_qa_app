@@ -25,7 +25,7 @@ A Retrieval-Augmented Generation (RAG) application for document-based question a
 ├── Dockerfile            <- Docker image definition
 ├── pyproject.toml        <- Project configuration and dependencies
 ├── README.md             <- This file
-├── requirements.txt      <- Python dependencies
+├── uv.lock               <- Locked Python dependencies
 │
 ├── data/                 <- Document storage directory
 │   └── *.pdf            <- PDF documents for processing
@@ -75,7 +75,7 @@ A Retrieval-Augmented Generation (RAG) application for document-based question a
 
 2. **Set up environment variables**:
 
-   Edit `src/config.yaml` with your settings
+   Copy `.env.example` to `.env` and fill in your Hugging Face token. Edit `src/config.yaml` for the other settings.
 
 3. **Launch the application**:
    ```bash
@@ -89,17 +89,16 @@ A Retrieval-Augmented Generation (RAG) application for document-based question a
 
 1. **Install dependencies**:
    ```bash
-   pip install -r requirements.txt
+   uv sync
    ```
 
 2. **Configure the application**:
 
-   Edit `src/config.yaml` with your settings
+   Copy `.env.example` to `.env` and fill in your Hugging Face token. Edit `src/config.yaml` for the other settings.
 
 3. **Run the application**:
    ```bash
-   cd src
-   python app.py
+   uv run python src/app.py
    ```
 
 ## Usage
@@ -114,14 +113,36 @@ A Retrieval-Augmented Generation (RAG) application for document-based question a
 The application is configured through `src/config.yaml`:
 
 - **RAG Settings**: Embedding models, similarity thresholds, LLM parameters
-- **HuggingFace Inference Endpoint**: API endpoints and authentication
+- **Hugging Face authentication**: `HUGGINGFACE_TOKEN` in the root `.env` file (ignored by Git), or in the environment. Environment variables take precedence. Docker Compose loads `.env` automatically.
 - **Application**: Server settings, debug mode, sharing options
 - **Q&A Generation**: Automated question generation parameters
 
 ## Development
 
-- **Code Style**: Black formatter with 88-character line length
-- **Import Sorting**: isort with black profile
+Install the development environment and activate the Git hooks after cloning:
+
+```bash
+uv sync --locked
+make install-hooks
+```
+
+Before each commit, prek runs `ruff check .`, `ruff format --check .`, and
+`ty check` through uv using the versions pinned in `uv.lock`. A failed check
+blocks the commit. Run all checks manually with `make check`.
+
+To fix lint and formatting issues:
+
+```bash
+uv run ruff check . --fix
+uv run ruff format .
+```
+
+Git hooks are local and must be installed in each clone. They can be bypassed
+with `git commit --no-verify`; enforcing these checks for a shared branch also
+requires CI and branch protection.
+
+- **Code Style and Import Sorting**: Ruff, with 88-character line length
+- **Type Checking**: ty
 - **Testing**: Pytest framework
 - **Python Version**: 3.13.x
 

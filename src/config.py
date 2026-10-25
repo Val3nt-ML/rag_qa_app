@@ -1,8 +1,8 @@
 from pathlib import Path
 
-from pydantic import BaseModel, ValidationError
-from pydantic_settings import BaseSettings
 import yaml
+from pydantic import BaseModel, Field, ValidationError
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class LLM(BaseModel):
@@ -23,12 +23,6 @@ class Rag(BaseModel):
     image_format: str
 
 
-class Azure(BaseModel):
-    api_version: str
-    endpoint: str
-    api_key: str
-
-
 class App(BaseModel):
     share: bool
     server_name: str
@@ -36,7 +30,14 @@ class App(BaseModel):
     debug: bool
 
 
-class HuggingFace(BaseModel):
+class HuggingFace(BaseSettings):
+    model_config = SettingsConfigDict(
+        env_file=Path(__file__).resolve().parents[1] / ".env",
+        env_prefix="HUGGINGFACE_",
+        extra="ignore",
+        hide_input_in_errors=True,
+    )
+
     token: str
 
 
@@ -45,17 +46,16 @@ class QAGenerator(BaseModel):
 
 
 class Settings(BaseSettings):
-    azure: Azure
     rag: Rag
     qa_generator: QAGenerator
     app: App
-    huggingface: HuggingFace
+    huggingface: HuggingFace = Field(default_factory=HuggingFace)
 
 
-def load_settings(
-    path: Path = Path(Path(__file__).resolve().parent / "config.yaml"),
-) -> Settings:
+def load_settings(path: Path | None = None) -> Settings:
     """Loads settings from a YAML file and validates them using Pydantic."""
+    if path is None:
+        path = Path(__file__).resolve().parent / "config.yaml"
     try:
         with open(path, "r") as file:
             # 1. Load the raw YAML data
